@@ -1,7 +1,8 @@
 import json
+import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -16,7 +17,8 @@ from app.scheduler import ScheduleRequest, create_schedule, list_schedules
 from app.shopify import ShopifyCredentials, fetch_shopify_orders
 
 
-app = FastAPI(title="Store Report SaaS MVP")
+app = FastAPI(title="Sales Dashboard")
+JOB_RUN_TOKEN = os.getenv("JOB_RUN_TOKEN")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -115,5 +117,7 @@ def get_schedules() -> dict:
 
 
 @app.post("/jobs/run-schedules")
-def run_schedules() -> dict:
+def run_schedules(x_job_token: str | None = Header(default=None)) -> dict:
+    if JOB_RUN_TOKEN and x_job_token != JOB_RUN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid job token.")
     return run_due_schedules(output_dir=OUTPUT_DIR)

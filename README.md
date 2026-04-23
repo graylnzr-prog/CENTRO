@@ -139,6 +139,7 @@ This repo now includes [render.yaml](C:\Users\Administrator\Documents\New%20proj
 ### Required environment variables
 
 - `SHOPIFY_API_VERSION`
+- `JOB_RUN_TOKEN`
 - `RESEND_API_KEY`
 - `RESEND_FROM`
 - `SMTP_HOST`
@@ -184,11 +185,19 @@ You can trigger due schedules in two ways:
 2. Local/script runner:
    - `python run_schedules.py`
 
-Recommended next deployment step:
+Recommended Render setup for reliability:
 
-- run `python run_schedules.py` from a cron job, GitHub Actions workflow, or a Render cron service
-- keep the web app focused on user interaction
-- let the job runner handle automated delivery
+- keep schedules and SQLite inside the web service
+- create a Render cron job that calls the web service endpoint instead of reading its own local SQLite file
+- protect the endpoint with `JOB_RUN_TOKEN`
+
+Example Render cron command:
+
+```bash
+curl -X POST https://your-service.onrender.com/jobs/run-schedules -H "X-Job-Token: $JOB_RUN_TOKEN"
+```
+
+This works better than `python run_schedules.py` in a separate Render cron service because the web app and the scheduler read the same SQLite database and output folder.
 
 ## Notes
 

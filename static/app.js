@@ -111,6 +111,28 @@ document.getElementById("schedule-form").addEventListener("submit", async (event
   await loadSchedules();
 });
 
+document.getElementById("job-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const token = formData.get("job_token");
+
+  const response = await fetch("/jobs/run-schedules", {
+    method: "POST",
+    headers: {
+      "X-Job-Token": token,
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    showToast(payload.detail || "Unable to run schedules.");
+    return;
+  }
+
+  renderJobResult(payload);
+  await loadSchedules();
+  showToast(`Processed ${payload.processed} due schedule(s).`);
+});
+
 async function handleReportResponse(response, successMessage) {
   const payload = await response.json();
   if (!response.ok) {
@@ -177,6 +199,25 @@ function showToast(message) {
   showToast.timeoutId = window.setTimeout(() => {
     toast.classList.add("hidden");
   }, 2800);
+}
+
+function renderJobResult(payload) {
+  const container = document.getElementById("job-result");
+  container.classList.remove("hidden");
+
+  if (!payload.results.length) {
+    container.innerHTML = listItem("No due schedules", "Nothing was ready to send right now.");
+    return;
+  }
+
+  container.innerHTML = payload.results
+    .map((item) => {
+      if (item.status === "sent") {
+        return listItem(`Schedule ${item.schedule_id}`, `Sent via ${item.provider}`);
+      }
+      return listItem(`Schedule ${item.schedule_id}`, `Failed: ${item.error}`);
+    })
+    .join("");
 }
 
 async function loadSchedules() {
