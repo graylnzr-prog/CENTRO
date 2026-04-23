@@ -3,11 +3,11 @@ import smtplib
 from email.message import EmailMessage
 
 import requests
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class EmailRequest(BaseModel):
-    recipient: EmailStr
+    recipient: str
     subject: str
     body: str
 
