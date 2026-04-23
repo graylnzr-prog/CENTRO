@@ -5,6 +5,9 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from app.emailer import EmailRequest, build_report_email_body, send_report_email
 from app.jobs import run_due_schedules
