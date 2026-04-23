@@ -139,13 +139,30 @@ This repo now includes [render.yaml](C:\Users\Administrator\Documents\New%20proj
 ### Required environment variables
 
 - `SHOPIFY_API_VERSION`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASSWORD`
 - `SMTP_FROM`
 
-If SMTP variables are missing, the app still works, but email delivery stays in preview mode and returns the composed report body instead of sending it.
+Recommended production setup: use `RESEND_API_KEY` and `RESEND_FROM`, which sends mail over HTTPS and fits Render better than raw SMTP. If Resend is not configured, the app falls back to SMTP. If neither is configured, it stays in preview mode and returns the composed report body instead of sending it.
+
+### Resend setup
+
+1. Create an account at [Resend](https://resend.com).
+2. Verify a sending domain.
+3. Create an API key.
+4. Add these to Render:
+   - `RESEND_API_KEY`
+   - `RESEND_FROM`
+
+Example `RESEND_FROM` value:
+
+```text
+SignalStack <reports@yourdomain.com>
+```
 
 ### Production note
 

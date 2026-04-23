@@ -75,7 +75,10 @@ def generate_shopify_report(
 
 @app.post("/email/send")
 def email_report(request: EmailRequest) -> dict:
-    result = send_report_email(request)
+    try:
+        result = send_report_email(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return result
 
 
@@ -90,7 +93,10 @@ def email_generated_report(
         subject=f"{report['headline']} report is ready",
         body=build_report_email_body(report),
     )
-    return send_report_email(email_request)
+    try:
+        return send_report_email(email_request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/schedules")

@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 
+import requests
 from pydantic import BaseModel, EmailStr
 
 
@@ -50,6 +51,15 @@ def build_report_email_body(report: dict) -> str:
 
 
 def send_report_email(request: EmailRequest) -> dict:
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    resend_from = os.getenv("RESEND_FROM") or os.getenv("SMTP_FROM")
+    if resend_api_key and resend_from:
+        return send_via_resend(
+            api_key=resend_api_key,
+            sender=resend_from,
+            request=request,
+        )
+
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = os.getenv("SMTP_PORT")
     smtp_user = os.getenv("SMTP_USER")
@@ -77,4 +87,37 @@ def send_report_email(request: EmailRequest) -> dict:
     return {
         "status": "sent",
         "message": f"Email sent to {request.recipient}",
+    }
+
+
+def send_via_resend(api_key: str, sender: str, request: EmailRequest) -> dict:
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": sender,
+            "to": [request.recipient],
+            "subject": request.subject,
+            "text": request.body,
+        },
+        timeout=20,
+    )
+
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+
+    if not response.ok:
+        message = payload.get("message") or f"Resend request failed with status {response.status_code}."
+        raise ValueError(message)
+
+    return {
+        "status": "sent",
+        "message": f"Email sent to {request.recipient}",
+        "provider": "resend",
+        "email_id": payload.get("id"),
     }
