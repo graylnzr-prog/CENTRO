@@ -131,8 +131,12 @@ def get_schedules() -> dict:
 
 @app.get("/auth/shopify/start")
 def start_shopify_auth(shop: str) -> RedirectResponse:
-    state = generate_oauth_state()
-    install_url = get_install_url(shop, state)
+    try:
+        state = generate_oauth_state()
+        install_url = get_install_url(shop, state)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     response = RedirectResponse(url=install_url, status_code=302)
     response.set_cookie(
         key="shopify_oauth_state",
@@ -156,12 +160,19 @@ def shopify_auth_callback(request: Request) -> RedirectResponse:
     if not expected_state or expected_state != returned_state:
         raise HTTPException(status_code=400, detail="Invalid Shopify OAuth state.")
 
-    shop = normalize_shop_domain(params.get("shop", ""))
+    try:
+        shop = normalize_shop_domain(params.get("shop", ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     code = params.get("code")
     if not code:
         raise HTTPException(status_code=400, detail="Shopify OAuth callback is missing the authorization code.")
 
-    token_payload = exchange_code_for_token(shop, code)
+    try:
+        token_payload = exchange_code_for_token(shop, code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     store_shop_connection(shop, token_payload["access_token"], token_payload.get("scope", ""))
 
     response = RedirectResponse(url=f"/?shopify=connected&shop={shop}", status_code=302)
