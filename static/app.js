@@ -39,6 +39,17 @@ document.getElementById("shopify-form").addEventListener("submit", async (event)
   await handleReportResponse(response, "Shopify report generated");
 });
 
+document.getElementById("shopify-login-button").addEventListener("click", () => {
+  const storeInput = document.querySelector('#shopify-form input[name="store_url"]');
+  const shop = storeInput.value.trim();
+  if (!shop) {
+    showToast("Enter your Shopify store URL first.");
+    return;
+  }
+
+  window.location.href = `/auth/shopify/start?shop=${encodeURIComponent(shop)}`;
+});
+
 document.getElementById("email-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.report) {
@@ -92,7 +103,6 @@ document.getElementById("schedule-form").addEventListener("submit", async (event
   if (state.source === "shopify") {
     const shopifyData = new FormData(document.getElementById("shopify-form"));
     payload.shopify_store_url = shopifyData.get("store_url");
-    payload.shopify_api_key = shopifyData.get("api_key");
   }
 
   const response = await fetch("/schedules", {
@@ -247,3 +257,17 @@ function formatDateTime(value) {
 }
 
 loadSchedules();
+hydrateShopifyConnectionState();
+
+function hydrateShopifyConnectionState() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("shopify") === "connected" && params.get("shop")) {
+    const shop = params.get("shop");
+    const storeInput = document.querySelector('#shopify-form input[name="store_url"]');
+    if (storeInput) {
+      storeInput.value = shop;
+    }
+    showToast(`Shopify connected for ${shop}`);
+    window.history.replaceState({}, "", window.location.pathname);
+  }
+}

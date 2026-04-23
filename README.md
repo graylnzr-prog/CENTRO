@@ -10,7 +10,7 @@ Only four features matter for the first version:
 
 1. Data input
    - Upload CSV
-   - Or connect a Shopify store with store URL + API key
+   - Or connect a Shopify store with Shopify login
 2. Report generation
    - Total sales
    - Sales trend
@@ -67,8 +67,8 @@ Only four features matter for the first version:
 - Decide a single report payload format for API + email
 
 ### Day 4
-- Add basic Shopify connection form
-- Start with a mocked/manual fetch if live integration slows you down
+- Add Shopify login flow
+- Save the store token after OAuth completes
 - Normalize Shopify order data into the same structure as CSV input
 
 ### Day 5
@@ -120,7 +120,13 @@ uvicorn app.main:app --reload
 
 Try the included [sample_sales.csv](C:\Users\Administrator\Documents\New%20project\sample_sales.csv) on the dashboard to see the happy path immediately.
 
-For Shopify, use a store domain like `acme-store.myshopify.com` and a valid Admin API access token with `read_orders`. By default the app calls Shopify GraphQL Admin API version `2026-04`; override with `SHOPIFY_API_VERSION` if needed.
+For Shopify, use a store domain like `acme-store.myshopify.com` and connect through Shopify login. Set `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, and `APP_BASE_URL` so the OAuth callback can complete. In your Shopify app settings, add this redirect URL:
+
+```text
+{APP_BASE_URL}/auth/shopify/callback
+```
+
+By default the app requests `read_orders` and calls Shopify GraphQL Admin API version `2026-04`; override with `SHOPIFY_SCOPES` or `SHOPIFY_API_VERSION` if needed.
 
 ## Deploy on Render
 
@@ -139,6 +145,10 @@ This repo now includes [render.yaml](C:\Users\Administrator\Documents\New%20proj
 ### Required environment variables
 
 - `SHOPIFY_API_VERSION`
+- `SHOPIFY_CLIENT_ID`
+- `SHOPIFY_CLIENT_SECRET`
+- `SHOPIFY_SCOPES`
+- `APP_BASE_URL`
 - `JOB_RUN_TOKEN`
 - `RESEND_API_KEY`
 - `RESEND_FROM`

@@ -7,7 +7,7 @@ from app.reports import (
     save_report_snapshot,
 )
 from app.scheduler import get_due_schedules, mark_schedule_run
-from app.shopify import ShopifyCredentials, fetch_shopify_orders
+from app.shopify import ShopifyCredentials, fetch_shopify_orders, get_shop_connection
 
 
 def run_due_schedules(output_dir: Path) -> dict:
@@ -63,12 +63,15 @@ def generate_scheduled_report(schedule: dict) -> dict:
 
     if source_type == "shopify":
         store_url = schedule.get("shopify_store_url")
-        api_key = schedule.get("shopify_api_key")
-        if not store_url or not api_key:
-            raise ValueError("Scheduled Shopify report is missing store credentials.")
+        if not store_url:
+            raise ValueError("Scheduled Shopify report is missing a store URL.")
+
+        connection = get_shop_connection(store_url)
+        if not connection:
+            raise ValueError("Scheduled Shopify report could not find a saved Shopify connection.")
 
         orders = fetch_shopify_orders(
-            ShopifyCredentials(store_url=store_url, api_key=api_key),
+            ShopifyCredentials(store_url=store_url, access_token=connection["access_token"]),
             period=schedule["frequency"],
         )
         return build_report_from_orders(orders, source_label=schedule["source_label"])

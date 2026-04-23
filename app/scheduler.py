@@ -16,7 +16,6 @@ class ScheduleRequest(BaseModel):
     source_label: str
     csv_path: str | None = None
     shopify_store_url: str | None = None
-    shopify_api_key: str | None = None
 
 
 def create_schedule(request: ScheduleRequest) -> str:
@@ -37,11 +36,10 @@ def create_schedule(request: ScheduleRequest) -> str:
                 source_label,
                 csv_path,
                 shopify_store_url,
-                shopify_api_key,
                 created_at,
                 last_run_at,
                 next_run_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 schedule_id,
@@ -51,7 +49,6 @@ def create_schedule(request: ScheduleRequest) -> str:
                 request.source_label,
                 request.csv_path,
                 request.shopify_store_url,
-                request.shopify_api_key,
                 now,
                 None,
                 next_run_at,
@@ -107,7 +104,6 @@ def get_due_schedules() -> list[dict]:
                 source_label,
                 csv_path,
                 shopify_store_url,
-                shopify_api_key,
                 created_at,
                 last_run_at,
                 next_run_at
@@ -153,7 +149,6 @@ def ensure_tables(connection: sqlite3.Connection) -> None:
             source_label TEXT NOT NULL DEFAULT 'manual',
             csv_path TEXT,
             shopify_store_url TEXT,
-            shopify_api_key TEXT,
             created_at TEXT,
             last_run_at TEXT,
             next_run_at TEXT
@@ -168,7 +163,6 @@ def ensure_tables(connection: sqlite3.Connection) -> None:
         "source_label": "TEXT NOT NULL DEFAULT 'manual'",
         "csv_path": "TEXT",
         "shopify_store_url": "TEXT",
-        "shopify_api_key": "TEXT",
         "created_at": "TEXT",
         "last_run_at": "TEXT",
         "next_run_at": "TEXT",
