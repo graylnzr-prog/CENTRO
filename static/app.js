@@ -1,5 +1,7 @@
 const state = {
   report: null,
+  source: null,
+  csvPath: null,
 };
 
 const tabs = document.querySelectorAll(".tab");
@@ -18,6 +20,8 @@ tabs.forEach((tab) => {
 document.getElementById("csv-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
+  const file = formData.get("file");
+  state.csvPath = file && file.name ? `output/reports/${file.name}` : null;
   const response = await fetch("/reports/csv", {
     method: "POST",
     body: formData,
@@ -68,12 +72,28 @@ document.getElementById("email-form").addEventListener("submit", async (event) =
 
 document.getElementById("schedule-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!state.report || !state.source) {
+    showToast("Generate a report before saving a schedule.");
+    return;
+  }
+
   const formData = new FormData(event.currentTarget);
   const payload = {
     email: formData.get("email"),
     frequency: formData.get("frequency"),
-    source_type: state.report ? state.report.source_label : "manual",
+    source_type: state.source,
+    source_label: state.report.source_label,
   };
+
+  if (state.source === "csv") {
+    payload.csv_path = state.csvPath;
+  }
+
+  if (state.source === "shopify") {
+    const shopifyData = new FormData(document.getElementById("shopify-form"));
+    payload.shopify_store_url = shopifyData.get("store_url");
+    payload.shopify_api_key = shopifyData.get("api_key");
+  }
 
   const response = await fetch("/schedules", {
     method: "POST",
@@ -99,6 +119,7 @@ async function handleReportResponse(response, successMessage) {
   }
 
   state.report = payload.report;
+  state.source = payload.source;
   renderReport(payload.report);
   showToast(successMessage);
 }
@@ -164,9 +185,24 @@ async function loadSchedules() {
   const container = document.getElementById("schedule-list");
   container.innerHTML = payload.schedules.length
     ? payload.schedules
-        .map((item) => listItem(`${item.frequency} -> ${item.email}`, item.source_type))
+        .map((item) => {
+          const nextRun = item.next_run_at ? `next ${formatDateTime(item.next_run_at)}` : "pending";
+          return listItem(`${item.frequency} -> ${item.email}`, `${item.source_type} - ${nextRun}`);
+        })
         .join("")
     : listItem("No schedules yet", "Save a daily or weekly delivery to keep the loop going.");
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 loadSchedules();

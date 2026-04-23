@@ -173,6 +173,23 @@ SQLite works for the MVP, but Render's local filesystem is not durable across se
 
 For portability, the repo also includes [Procfile](C:\Users\Administrator\Documents\New%20project\Procfile) and [\.gitignore](C:\Users\Administrator\Documents\New%20project\.gitignore).
 
+## Scheduled report sending
+
+Schedules now store enough source metadata to rerun CSV and Shopify reports later.
+
+You can trigger due schedules in two ways:
+
+1. HTTP endpoint:
+   - `POST /jobs/run-schedules`
+2. Local/script runner:
+   - `python run_schedules.py`
+
+Recommended next deployment step:
+
+- run `python run_schedules.py` from a cron job, GitHub Actions workflow, or a Render cron service
+- keep the web app focused on user interaction
+- let the job runner handle automated delivery
+
 ## Notes
 
 - Keep Shopify integration shallow at first.

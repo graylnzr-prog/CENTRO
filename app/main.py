@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.emailer import EmailRequest, build_report_email_body, send_report_email
+from app.jobs import run_due_schedules
 from app.reports import (
     build_report_from_csv,
     build_report_from_orders,
@@ -101,10 +102,18 @@ def email_generated_report(
 
 @app.post("/schedules")
 def schedule_report(request: ScheduleRequest) -> dict:
-    schedule_id = create_schedule(request)
+    payload = request.model_copy(deep=True)
+    if payload.csv_path:
+        payload.csv_path = str((BASE_DIR / payload.csv_path).resolve())
+    schedule_id = create_schedule(payload)
     return {"status": "scheduled", "schedule_id": schedule_id}
 
 
 @app.get("/schedules")
 def get_schedules() -> dict:
     return {"schedules": list_schedules()}
+
+
+@app.post("/jobs/run-schedules")
+def run_schedules() -> dict:
+    return run_due_schedules(output_dir=OUTPUT_DIR)
