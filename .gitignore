@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+database/db.sqlite
+output/reports/*.json
+output/reports/*.csv
+*.log
