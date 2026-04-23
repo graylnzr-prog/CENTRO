@@ -99,8 +99,9 @@
                 <input type="text" name="store_url" placeholder="acme-store.myshopify.com" required />
               </label>
               <div class="connect-row">
-                <button type="button" id="shopify-login-button" class="button-ghost">Connect with Shopify</button>
-                <p class="hint">Sign in once, then generate reports without pasting Admin API keys.</p>
+                <button type="button" id="shopify-login-button" class="button-primary">Connect Shopify</button>
+                <p class="hint">You will be redirected to Shopify to approve access, then returned here automatically.</p>
+                <div id="shopify-connection-status" class="connection-status hidden"></div>
               </div>
               <label class="field">
                 <span>Period</span>
@@ -109,7 +110,7 @@
                   <option value="daily">Daily</option>
                 </select>
               </label>
-              <button type="submit" class="button-primary">Generate from Shopify</button>
+              <button type="submit" id="shopify-generate-button" class="button-ghost">Generate from Shopify</button>
             </div>
           </form>
         </section>

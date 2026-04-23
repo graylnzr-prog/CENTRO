@@ -2,6 +2,7 @@ const state = {
   report: null,
   source: null,
   csvPath: null,
+  shopifyConnected: false,
 };
 
 const tabs = document.querySelectorAll(".tab");
@@ -31,6 +32,11 @@ document.getElementById("csv-form").addEventListener("submit", async (event) => 
 
 document.getElementById("shopify-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!state.shopifyConnected) {
+    showToast("Connect Shopify first, then generate the report.");
+    return;
+  }
+
   const formData = new FormData(event.currentTarget);
   const response = await fetch("/reports/shopify", {
     method: "POST",
@@ -258,6 +264,7 @@ function formatDateTime(value) {
 
 loadSchedules();
 hydrateShopifyConnectionState();
+updateShopifyConnectionUi();
 
 function hydrateShopifyConnectionState() {
   const params = new URLSearchParams(window.location.search);
@@ -267,7 +274,28 @@ function hydrateShopifyConnectionState() {
     if (storeInput) {
       storeInput.value = shop;
     }
+    state.shopifyConnected = true;
+    updateShopifyConnectionUi(shop);
     showToast(`Shopify connected for ${shop}`);
     window.history.replaceState({}, "", window.location.pathname);
   }
+}
+
+function updateShopifyConnectionUi(shop = "") {
+  const status = document.getElementById("shopify-connection-status");
+  const button = document.getElementById("shopify-generate-button");
+
+  if (state.shopifyConnected) {
+    status.textContent = shop ? `Connected to ${shop}` : "Shopify connected";
+    status.classList.remove("hidden");
+    status.classList.add("connected");
+    button.classList.remove("button-ghost");
+    button.classList.add("button-secondary");
+    return;
+  }
+
+  status.textContent = "Not connected yet";
+  status.classList.remove("hidden", "connected");
+  button.classList.remove("button-secondary");
+  button.classList.add("button-ghost");
 }
