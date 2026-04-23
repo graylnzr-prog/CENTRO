@@ -9,6 +9,8 @@ const state = {
 const tabs = document.querySelectorAll(".tab");
 const panels = document.querySelectorAll(".panel");
 const toast = document.getElementById("toast");
+const shopifyModal = document.getElementById("shopify-modal");
+const shopifyModalForm = document.getElementById("shopify-modal-form");
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -48,10 +50,23 @@ document.getElementById("shopify-form").addEventListener("submit", async (event)
 });
 
 document.getElementById("shopify-login-button").addEventListener("click", () => {
-  const previousShop = state.shopifyShop || window.localStorage.getItem("shopifyShop") || "";
-  const shop = window.prompt("Enter your Shopify store domain", previousShop || "your-store.myshopify.com");
+  openShopifyModal();
+});
+
+document.getElementById("shopify-modal-close").addEventListener("click", closeShopifyModal);
+
+shopifyModal.addEventListener("click", (event) => {
+  if (event.target === shopifyModal) {
+    closeShopifyModal();
+  }
+});
+
+shopifyModalForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const shop = String(formData.get("shop") || "").trim();
   if (!shop) {
-    showToast("Shopify login needs a store domain like your-store.myshopify.com.");
+    showToast("Enter your Shopify store domain.");
     return;
   }
 
@@ -218,6 +233,20 @@ function showToast(message) {
   }, 2800);
 }
 
+function openShopifyModal() {
+  const input = shopifyModalForm.querySelector('input[name="shop"]');
+  const previousShop = state.shopifyShop || window.localStorage.getItem("shopifyShop") || "";
+  input.value = previousShop;
+  shopifyModal.classList.remove("hidden");
+  shopifyModal.setAttribute("aria-hidden", "false");
+  window.setTimeout(() => input.focus(), 20);
+}
+
+function closeShopifyModal() {
+  shopifyModal.classList.add("hidden");
+  shopifyModal.setAttribute("aria-hidden", "true");
+}
+
 function renderJobResult(payload) {
   const container = document.getElementById("job-result");
   container.classList.remove("hidden");
@@ -274,6 +303,7 @@ function hydrateShopifyConnectionState() {
     state.shopifyShop = shop;
     state.shopifyConnected = true;
     window.localStorage.setItem("shopifyShop", shop);
+    closeShopifyModal();
     updateShopifyConnectionUi(shop);
     showToast(`Shopify connected for ${shop}`);
     window.history.replaceState({}, "", window.location.pathname);

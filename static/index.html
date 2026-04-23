@@ -95,8 +95,8 @@
           <form id="shopify-form" class="panel" data-panel="shopify">
             <div class="panel-shell">
               <div class="connect-row">
-                <button type="button" id="shopify-login-button" class="button-primary">Shopify Login</button>
-                <p class="hint">Click to connect your Shopify store, approve access, and return here automatically.</p>
+                <button type="button" id="shopify-login-button" class="button-primary">Log In to Shopify</button>
+                <p class="hint">You will be redirected to Shopify, approve access, and return here automatically.</p>
                 <div id="shopify-connection-status" class="connection-status hidden"></div>
               </div>
               <label class="field">
@@ -211,6 +211,34 @@
         </form>
         <div id="job-result" class="list-grid compact hidden"></div>
       </section>
+
+      <div id="shopify-modal" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shopify-modal-title">
+          <div class="modal-header">
+            <div>
+              <p class="eyebrow">Shopify Login</p>
+              <h2 id="shopify-modal-title">Connect your Shopify store</h2>
+            </div>
+            <button type="button" id="shopify-modal-close" class="modal-close" aria-label="Close">
+              ×
+            </button>
+          </div>
+          <form id="shopify-modal-form" class="stack-form modal-form">
+            <label class="field">
+              <span>Store domain</span>
+              <input
+                type="text"
+                name="shop"
+                placeholder="your-store.myshopify.com"
+                autocomplete="off"
+                required
+              />
+            </label>
+            <p class="hint">We’ll redirect you to Shopify to approve access, then bring you right back here.</p>
+            <button type="submit" class="button-primary">Continue to Shopify</button>
+          </form>
+        </div>
+      </div>
 
       <div id="toast" class="toast hidden"></div>
     </main>

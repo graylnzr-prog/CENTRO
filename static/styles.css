@@ -530,6 +530,51 @@ select:focus {
   align-items: end;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(16, 23, 38, 0.42);
+  backdrop-filter: blur(10px);
+  z-index: 30;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  padding: 22px;
+  border-radius: 28px;
+  background: rgba(255, 252, 246, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 24px 80px rgba(16, 23, 38, 0.18);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.modal-form {
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.modal-close {
+  border: 0;
+  background: rgba(23, 33, 43, 0.06);
+  color: var(--accent-deep);
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .toast {
   position: fixed;
   right: 20px;
