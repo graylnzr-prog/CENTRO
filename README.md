@@ -120,13 +120,25 @@ uvicorn app.main:app --reload
 
 Try the included [sample_sales.csv](C:\Users\Administrator\Documents\New%20project\sample_sales.csv) on the dashboard to see the happy path immediately.
 
-For Shopify, use a store domain like `acme-store.myshopify.com` and connect through Shopify login. Set `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, and `APP_BASE_URL` so the OAuth callback can complete. In your Shopify app settings, add this redirect URL:
+For Shopify, connect through Shopify login. The app will ask for the store domain at login time, then return to the dashboard after approval. Set `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, and `APP_BASE_URL` so the OAuth callback can complete. In your Shopify app settings, add this redirect URL:
 
 ```text
 {APP_BASE_URL}/auth/shopify/callback
 ```
 
 By default the app requests `read_orders` and calls Shopify GraphQL Admin API version `2026-04`; override with `SHOPIFY_SCOPES` or `SHOPIFY_API_VERSION` if needed.
+
+If you see this error:
+
+```text
+{"detail":"Shopify OAuth is not configured. Set SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET."}
+```
+
+set these environment variables in Render and redeploy:
+
+- `SHOPIFY_CLIENT_ID`
+- `SHOPIFY_CLIENT_SECRET`
+- `APP_BASE_URL`
 
 ## Deploy on Render
 

@@ -3,6 +3,7 @@ const state = {
   source: null,
   csvPath: null,
   shopifyConnected: false,
+  shopifyShop: "",
 };
 
 const tabs = document.querySelectorAll(".tab");
@@ -38,6 +39,7 @@ document.getElementById("shopify-form").addEventListener("submit", async (event)
   }
 
   const formData = new FormData(event.currentTarget);
+  formData.append("store_url", state.shopifyShop);
   const response = await fetch("/reports/shopify", {
     method: "POST",
     body: formData,
@@ -46,10 +48,10 @@ document.getElementById("shopify-form").addEventListener("submit", async (event)
 });
 
 document.getElementById("shopify-login-button").addEventListener("click", () => {
-  const storeInput = document.querySelector('#shopify-form input[name="store_url"]');
-  const shop = storeInput.value.trim();
+  const previousShop = state.shopifyShop || window.localStorage.getItem("shopifyShop") || "";
+  const shop = window.prompt("Enter your Shopify store domain", previousShop || "your-store.myshopify.com");
   if (!shop) {
-    showToast("Enter your Shopify store URL first.");
+    showToast("Shopify login needs a store domain like your-store.myshopify.com.");
     return;
   }
 
@@ -107,8 +109,7 @@ document.getElementById("schedule-form").addEventListener("submit", async (event
   }
 
   if (state.source === "shopify") {
-    const shopifyData = new FormData(document.getElementById("shopify-form"));
-    payload.shopify_store_url = shopifyData.get("store_url");
+    payload.shopify_store_url = state.shopifyShop;
   }
 
   const response = await fetch("/schedules", {
@@ -270,14 +271,20 @@ function hydrateShopifyConnectionState() {
   const params = new URLSearchParams(window.location.search);
   if (params.get("shopify") === "connected" && params.get("shop")) {
     const shop = params.get("shop");
-    const storeInput = document.querySelector('#shopify-form input[name="store_url"]');
-    if (storeInput) {
-      storeInput.value = shop;
-    }
+    state.shopifyShop = shop;
     state.shopifyConnected = true;
+    window.localStorage.setItem("shopifyShop", shop);
     updateShopifyConnectionUi(shop);
     showToast(`Shopify connected for ${shop}`);
     window.history.replaceState({}, "", window.location.pathname);
+    return;
+  }
+
+  const savedShop = window.localStorage.getItem("shopifyShop");
+  if (savedShop) {
+    state.shopifyShop = savedShop;
+    state.shopifyConnected = true;
+    updateShopifyConnectionUi(savedShop);
   }
 }
 
