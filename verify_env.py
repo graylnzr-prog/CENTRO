@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 2. Retrieve variables using the KEY name defined in your .env
-shop_url = os.getenv("SHOPIFY_SHOP_URL")
-access_token = os.getenv("SHOPIFY_ACCESS_TOKEN")
+shop_url = os.getenv("SHOPIFY_CLIENT_URL")
+access_token = os.getenv("SHOPIFY_CLIENT_SECRET")
 
 print("--- Architectural Foundation Check ---")
 
