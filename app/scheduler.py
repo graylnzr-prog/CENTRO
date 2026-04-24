@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -5,8 +6,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "database" / "db.sqlite"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("APP_DATA_DIR") or str(BASE_DIR)).resolve()
+DATABASE_PATH = DATA_DIR / "database" / "db.sqlite"
 
 
 class ScheduleRequest(BaseModel):

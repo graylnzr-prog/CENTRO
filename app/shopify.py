@@ -16,7 +16,9 @@ SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID", "")
 SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET", "")
 SHOPIFY_SCOPES = os.getenv("SHOPIFY_SCOPES", "read_orders")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "database" / "db.sqlite"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("APP_DATA_DIR") or str(BASE_DIR)).resolve()
+DATABASE_PATH = DATA_DIR / "database" / "db.sqlite"
 
 ORDERS_QUERY = """
 query GetRecentOrders($first: Int!) {
@@ -119,6 +121,44 @@ def store_shop_connection(shop: str, access_token: str, scopes: str) -> None:
             ),
         )
         connection.commit()
+    finally:
+        connection.close()
+
+
+def store_oauth_state(state: str) -> None:
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(DATABASE_PATH)
+    try:
+        ensure_shopify_tables(connection)
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO shopify_oauth_states (state, created_at)
+            VALUES (?, ?)
+            """,
+            (
+                state,
+                datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def consume_oauth_state(state: str) -> bool:
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(DATABASE_PATH)
+    try:
+        ensure_shopify_tables(connection)
+        cursor = connection.execute(
+            """
+            DELETE FROM shopify_oauth_states
+            WHERE state = ?
+            """,
+            (state,),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
     finally:
         connection.close()
 
@@ -243,6 +283,14 @@ def ensure_shopify_tables(connection: sqlite3.Connection) -> None:
             access_token TEXT NOT NULL,
             scopes TEXT,
             installed_at TEXT
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS shopify_oauth_states (
+            state TEXT PRIMARY KEY,
+            created_at TEXT
         )
         """
     )

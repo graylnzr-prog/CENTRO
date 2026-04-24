@@ -139,6 +139,9 @@ set these environment variables in Render and redeploy:
 - `SHOPIFY_CLIENT_ID`
 - `SHOPIFY_CLIENT_SECRET`
 - `APP_BASE_URL`
+- `APP_DATA_DIR`
+
+For private MVP deployment, set `APP_ADMIN_TOKEN` too. The dashboard now expects that token before it allows CSV uploads, Shopify pulls, email sends, or schedule access.
 
 ## Deploy on Render
 
@@ -161,6 +164,8 @@ This repo now includes [render.yaml](C:\Users\Administrator\Documents\New%20proj
 - `SHOPIFY_CLIENT_SECRET`
 - `SHOPIFY_SCOPES`
 - `APP_BASE_URL`
+- `APP_DATA_DIR`
+- `APP_ADMIN_TOKEN`
 - `JOB_RUN_TOKEN`
 - `RESEND_API_KEY`
 - `RESEND_FROM`
@@ -171,6 +176,10 @@ This repo now includes [render.yaml](C:\Users\Administrator\Documents\New%20proj
 - `SMTP_FROM`
 
 Recommended production setup: use `RESEND_API_KEY` and `RESEND_FROM`, which sends mail over HTTPS and fits Render better than raw SMTP. If Resend is not configured, the app falls back to SMTP. If neither is configured, it stays in preview mode and returns the composed report body instead of sending it.
+
+The web UI uses `APP_ADMIN_TOKEN` as a simple private-access gate for all sensitive actions. Set it in Render, then paste the same token into the dashboard's Private Access card when you open the app.
+
+`APP_DATA_DIR` lets the app move its SQLite file, Shopify tokens, and generated reports onto a mounted disk path. The included Render config points it at `/opt/render/project/src/data`.
 
 ### Resend setup
 
@@ -191,7 +200,7 @@ SignalStack <reports@yourdomain.com>
 
 SQLite works for the MVP, but Render's local filesystem is not durable across service restarts unless you attach a persistent disk. For a real recurring-report workflow, either:
 
-- attach a Render disk for `/database` and `/output`, or
+- attach a Render disk mounted at `/opt/render/project/src/data`, or
 - move schedules and generated reports to a hosted database/object storage later.
 
 For portability, the repo also includes [Procfile](C:\Users\Administrator\Documents\New%20project\Procfile) and [\.gitignore](C:\Users\Administrator\Documents\New%20project\.gitignore).
@@ -206,6 +215,8 @@ You can trigger due schedules in two ways:
    - `POST /jobs/run-schedules`
 2. Local/script runner:
    - `python run_schedules.py`
+
+`run_schedules.py` now loads `.env` locally before it runs, so the same Shopify and email credentials work for manual testing outside the web server too.
 
 Recommended Render setup for reliability:
 

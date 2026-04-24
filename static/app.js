@@ -4,11 +4,14 @@ const state = {
   csvPath: null,
   shopifyConnected: false,
   shopifyShop: "",
+  adminToken: window.localStorage.getItem("adminToken") || "",
 };
 
 const tabs = document.querySelectorAll(".tab");
 const panels = document.querySelectorAll(".panel");
 const toast = document.getElementById("toast");
+const accessForm = document.getElementById("access-form");
+const accessStatus = document.getElementById("access-status");
 const shopifyModal = document.getElementById("shopify-modal");
 const shopifyModalForm = document.getElementById("shopify-modal-form");
 
@@ -21,12 +24,34 @@ tabs.forEach((tab) => {
   });
 });
 
-document.getElementById("csv-form").addEventListener("submit", async (event) => {
+accessForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
+  const token = String(formData.get("admin_token") || "").trim();
+  if (!token) {
+    showToast("Paste your APP_ADMIN_TOKEN to unlock the dashboard.");
+    return;
+  }
+
+  state.adminToken = token;
+  window.localStorage.setItem("adminToken", token);
+  updateAccessUi();
+  showToast("Private access saved on this browser.");
+  await loadSchedules();
+});
+
+document.getElementById("csv-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!ensureAdminToken()) {
+    return;
+  }
+
+  const formData = new FormData(event.currentTarget);
   const file = formData.get("file");
-  state.csvPath = file && file.name ? `output/reports/${file.name}` : null;
-  const response = await fetch("/reports/csv", {
+  const safeName = file && file.name ? file.name.split(/[/\\]/).pop() : null;
+  state.csvPath = safeName ? `output/reports/${safeName}` : null;
+
+  const response = await authorizedFetch("/reports/csv", {
     method: "POST",
     body: formData,
   });
@@ -35,6 +60,9 @@ document.getElementById("csv-form").addEventListener("submit", async (event) => 
 
 document.getElementById("shopify-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!ensureAdminToken()) {
+    return;
+  }
   if (!state.shopifyConnected) {
     showToast("Connect Shopify first, then generate the report.");
     return;
@@ -42,7 +70,7 @@ document.getElementById("shopify-form").addEventListener("submit", async (event)
 
   const formData = new FormData(event.currentTarget);
   formData.append("store_url", state.shopifyShop);
-  const response = await fetch("/reports/shopify", {
+  const response = await authorizedFetch("/reports/shopify", {
     method: "POST",
     body: formData,
   });
@@ -50,6 +78,9 @@ document.getElementById("shopify-form").addEventListener("submit", async (event)
 });
 
 document.getElementById("shopify-login-button").addEventListener("click", () => {
+  if (!ensureAdminToken()) {
+    return;
+  }
   openShopifyModal();
 });
 
@@ -61,8 +92,12 @@ shopifyModal.addEventListener("click", (event) => {
   }
 });
 
-shopifyModalForm.addEventListener("submit", (event) => {
+shopifyModalForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!ensureAdminToken()) {
+    return;
+  }
+
   const formData = new FormData(event.currentTarget);
   const shop = String(formData.get("shop") || "").trim();
   if (!shop) {
@@ -70,11 +105,24 @@ shopifyModalForm.addEventListener("submit", (event) => {
     return;
   }
 
-  window.location.href = `/auth/shopify/start?shop=${encodeURIComponent(shop)}`;
+  const response = await authorizedFetch("/auth/shopify/start", {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    showToast(payload.detail || "Unable to start Shopify login.");
+    return;
+  }
+
+  window.location.href = payload.install_url;
 });
 
 document.getElementById("email-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!ensureAdminToken()) {
+    return;
+  }
   if (!state.report) {
     showToast("Generate a report before trying to email it.");
     return;
@@ -83,7 +131,7 @@ document.getElementById("email-form").addEventListener("submit", async (event) =
   const formData = new FormData(event.currentTarget);
   formData.append("report_payload", JSON.stringify(state.report));
 
-  const response = await fetch("/email/send-report", {
+  const response = await authorizedFetch("/email/send-report", {
     method: "POST",
     body: formData,
   });
@@ -106,6 +154,9 @@ document.getElementById("email-form").addEventListener("submit", async (event) =
 
 document.getElementById("schedule-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!ensureAdminToken()) {
+    return;
+  }
   if (!state.report || !state.source) {
     showToast("Generate a report before saving a schedule.");
     return;
@@ -127,7 +178,7 @@ document.getElementById("schedule-form").addEventListener("submit", async (event
     payload.shopify_store_url = state.shopifyShop;
   }
 
-  const response = await fetch("/schedules", {
+  const response = await authorizedFetch("/schedules", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -164,6 +215,26 @@ document.getElementById("job-form").addEventListener("submit", async (event) => 
   await loadSchedules();
   showToast(`Processed ${payload.processed} due schedule(s).`);
 });
+
+async function authorizedFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (state.adminToken) {
+    headers.set("X-Admin-Token", state.adminToken);
+  }
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
+function ensureAdminToken() {
+  if (state.adminToken) {
+    return true;
+  }
+
+  showToast("Paste APP_ADMIN_TOKEN into Private Access before using this action.");
+  return false;
+}
 
 async function handleReportResponse(response, successMessage) {
   const payload = await response.json();
@@ -267,9 +338,19 @@ function renderJobResult(payload) {
 }
 
 async function loadSchedules() {
-  const response = await fetch("/schedules");
-  const payload = await response.json();
   const container = document.getElementById("schedule-list");
+  if (!state.adminToken) {
+    container.innerHTML = listItem("Dashboard locked", "Paste APP_ADMIN_TOKEN above to view and save schedules.");
+    return;
+  }
+
+  const response = await authorizedFetch("/schedules");
+  const payload = await response.json();
+  if (!response.ok) {
+    container.innerHTML = listItem("Schedules unavailable", payload.detail || "Private access needs attention.");
+    return;
+  }
+
   container.innerHTML = payload.schedules.length
     ? payload.schedules
         .map((item) => {
@@ -291,10 +372,6 @@ function formatDateTime(value) {
     timeStyle: "short",
   }).format(date);
 }
-
-loadSchedules();
-hydrateShopifyConnectionState();
-updateShopifyConnectionUi();
 
 function hydrateShopifyConnectionState() {
   const params = new URLSearchParams(window.location.search);
@@ -336,3 +413,22 @@ function updateShopifyConnectionUi(shop = "") {
   button.classList.remove("button-secondary");
   button.classList.add("button-ghost");
 }
+
+function updateAccessUi() {
+  const input = accessForm.querySelector('input[name="admin_token"]');
+  if (state.adminToken) {
+    accessStatus.textContent = "Unlocked";
+    accessStatus.classList.remove("muted");
+    input.value = state.adminToken;
+    return;
+  }
+
+  accessStatus.textContent = "Locked";
+  accessStatus.classList.add("muted");
+  input.value = "";
+}
+
+updateAccessUi();
+hydrateShopifyConnectionState();
+updateShopifyConnectionUi();
+loadSchedules();

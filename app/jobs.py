@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from app.emailer import EmailRequest, build_report_email_body, send_report_email
@@ -8,6 +9,10 @@ from app.reports import (
 )
 from app.scheduler import get_due_schedules, mark_schedule_run
 from app.shopify import ShopifyCredentials, fetch_shopify_orders, get_shop_connection
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("APP_DATA_DIR") or str(BASE_DIR)).resolve()
+REPORTS_DIR = DATA_DIR / "output" / "reports"
 
 
 def run_due_schedules(output_dir: Path) -> dict:
@@ -55,7 +60,7 @@ def generate_scheduled_report(schedule: dict) -> dict:
         if not csv_path:
             raise ValueError("Scheduled CSV report is missing its source file path.")
 
-        path = Path(csv_path)
+        path = resolve_reports_csv_path(csv_path)
         if not path.exists():
             raise ValueError(f"Scheduled CSV source not found: {csv_path}")
 
@@ -77,3 +82,13 @@ def generate_scheduled_report(schedule: dict) -> dict:
         return build_report_from_orders(orders, source_label=schedule["source_label"])
 
     raise ValueError(f"Unsupported schedule source type: {source_type}")
+
+
+def resolve_reports_csv_path(csv_path: str) -> Path:
+    candidate = Path(csv_path)
+    resolved = candidate.resolve() if candidate.is_absolute() else (BASE_DIR / candidate).resolve()
+    reports_root = REPORTS_DIR.resolve()
+
+    if reports_root != resolved and reports_root not in resolved.parents:
+        raise ValueError("Scheduled CSV path must stay inside output/reports.")
+    return resolved

@@ -66,6 +66,24 @@
         </div>
       </section>
 
+      <section class="card access-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Private Access</p>
+            <h2>Unlock dashboard actions</h2>
+          </div>
+          <span id="access-status" class="pill muted">Locked</span>
+        </div>
+        <form id="access-form" class="access-form">
+          <label class="field">
+            <span>Admin token</span>
+            <input type="password" name="admin_token" placeholder="Paste APP_ADMIN_TOKEN" required />
+          </label>
+          <button type="submit" class="button-secondary">Save private access</button>
+        </form>
+        <p class="hint">CSV uploads, Shopify pulls, email delivery, and schedules stay behind this private token.</p>
+      </section>
+
       <section class="dashboard-grid">
         <section class="card section-card">
           <div class="section-heading">
