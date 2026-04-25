@@ -1,0 +1,77 @@
+import os
+from pathlib import Path
+
+from app.emailer import EmailRequest, build_report_email_body, send_report_email
+from app.reports import (
+    build_report_from_csv,
+    save_report_snapshot,
+)
+from app.scheduler import get_due_schedules, mark_schedule_run
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("APP_DATA_DIR") or str(BASE_DIR)).resolve()
+REPORTS_DIR = DATA_DIR / "output" / "reports"
+
+
+def run_due_schedules(output_dir: Path) -> dict:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    schedules = get_due_schedules()
+    results = []
+
+    for schedule in schedules:
+        try:
+            report = generate_scheduled_report(schedule)
+            save_report_snapshot(report, output_dir)
+            email_request = EmailRequest(
+                recipient=schedule["email"],
+                subject=f"{report['headline']} report is ready",
+                body=build_report_email_body(report),
+            )
+            delivery = send_report_email(email_request)
+            mark_schedule_run(schedule["id"], schedule["frequency"])
+            results.append(
+                {
+                    "schedule_id": schedule["id"],
+                    "status": "sent",
+                    "provider": delivery.get("provider", delivery["status"]),
+                }
+            )
+        except Exception as exc:
+            results.append(
+                {
+                    "schedule_id": schedule["id"],
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            )
+
+    return {
+        "processed": len(schedules),
+        "results": results,
+    }
+
+
+def generate_scheduled_report(schedule: dict) -> dict:
+    source_type = schedule["source_type"]
+    if source_type == "csv":
+        csv_path = schedule.get("csv_path")
+        if not csv_path:
+            raise ValueError("Scheduled CSV report is missing its source file path.")
+
+        path = resolve_reports_csv_path(csv_path)
+        if not path.exists():
+            raise ValueError(f"Scheduled CSV source not found: {csv_path}")
+
+        return build_report_from_csv(path, source_label=schedule["source_label"])
+
+    raise ValueError(f"Unsupported schedule source type: {source_type}")
+
+
+def resolve_reports_csv_path(csv_path: str) -> Path:
+    candidate = Path(csv_path)
+    resolved = candidate.resolve() if candidate.is_absolute() else (DATA_DIR / candidate).resolve()
+    reports_root = REPORTS_DIR.resolve()
+
+    if reports_root != resolved and reports_root not in resolved.parents:
+        raise ValueError("Scheduled CSV path must stay inside output/reports.")
+    return resolved
