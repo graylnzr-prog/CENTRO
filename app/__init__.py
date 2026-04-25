@@ -1,1 +1,0 @@
-"""MVP SaaS application package."""
