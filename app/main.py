@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Respon
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from clerk_backend_api import Clerk
+from clerk_backend_api.security.types import AuthenticateRequestOptions
 
 load_dotenv()
 
@@ -23,7 +24,18 @@ app = FastAPI(title="Sales Dashboard")
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-clerk_client = Clerk(bearer_auth=os.getenv("CLERK_API_KEY"))
+CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY") or os.getenv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "")
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY") or os.getenv("CLERK_API_KEY", "")
+CLERK_ALLOWED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CLERK_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if CLERK_PUBLISHABLE_KEY:
+    os.environ.setdefault("CLERK_PUBLISHABLE_KEY", CLERK_PUBLISHABLE_KEY)
+if CLERK_SECRET_KEY:
+    os.environ.setdefault("CLERK_SECRET_KEY", CLERK_SECRET_KEY)
+clerk_client = Clerk(bearer_auth=CLERK_SECRET_KEY) if CLERK_SECRET_KEY else None
 SESSION_SECRET = os.getenv("APP_SESSION_SECRET") or f"{ADMIN_USERNAME}:{ADMIN_PASSWORD}"
 SESSION_COOKIE_NAME = "sales_dashboard_session"
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "28800"))
@@ -41,7 +53,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 def get_current_admin(request: Request) -> str | None:
     cookie_value = request.cookies.get(SESSION_COOKIE_NAME)
-    if not cookie_value or not ADMIN_USERNAME or not ADMIN_PASSWORD:
+    if not cookie_value:
         return None
 
     try:
@@ -49,7 +61,9 @@ def get_current_admin(request: Request) -> str | None:
     except ValueError:
         return None
 
-    if username != ADMIN_USERNAME:
+    is_password_admin = bool(ADMIN_USERNAME and ADMIN_PASSWORD and username == ADMIN_USERNAME)
+    is_clerk_admin = bool(CLERK_SECRET_KEY and username.startswith("clerk:"))
+    if not is_password_admin and not is_clerk_admin:
         return None
 
     try:
@@ -74,7 +88,7 @@ def get_current_admin(request: Request) -> str | None:
 
 
 def require_admin_session(request: Request) -> str:
-    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+    if not (ADMIN_USERNAME and ADMIN_PASSWORD) and not CLERK_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Admin login is not configured.")
 
     username = get_current_admin(request)
@@ -110,6 +124,49 @@ def clear_session_cookie(response: Response) -> None:
     response.delete_cookie(SESSION_COOKIE_NAME, path="/")
 
 
+def display_admin_name(username: str | None) -> str | None:
+    if not username:
+        return None
+    if username.startswith("clerk:"):
+        return "Google account"
+    return username
+
+
+def get_clerk_authorized_parties(request: Request) -> list[str]:
+    parties = list(CLERK_ALLOWED_ORIGINS)
+    app_base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
+    request_origin = request.headers.get("origin", "").rstrip("/")
+    request_base_url = str(request.base_url).rstrip("/")
+
+    for origin in (app_base_url, request_origin, request_base_url):
+        if origin and origin not in parties:
+            parties.append(origin)
+    return parties
+
+
+def authenticate_clerk_request(request: Request):
+    if not clerk_client or not CLERK_PUBLISHABLE_KEY:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+
+    if not request.headers.get("authorization", "").startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Clerk session token.")
+
+    request_state = clerk_client.authenticate_request(
+        request,
+        AuthenticateRequestOptions(
+            authorized_parties=get_clerk_authorized_parties(request),
+        ),
+    )
+    is_authenticated = bool(
+        getattr(request_state, "is_authenticated", False)
+        or getattr(request_state, "is_signed_in", False)
+    )
+    if not is_authenticated:
+        reason = getattr(request_state, "reason", None) or "invalid session"
+        raise HTTPException(status_code=401, detail=f"Google sign-in failed: {reason}")
+    return request_state
+
+
 def resolve_reports_csv_path(csv_path: str) -> Path:
     candidate = Path(csv_path)
     resolved = candidate.resolve() if candidate.is_absolute() else (DATA_DIR / candidate).resolve()
@@ -135,7 +192,15 @@ def healthcheck() -> dict:
 @app.get("/auth/status")
 def auth_status(request: Request) -> dict:
     username = get_current_admin(request)
-    return {"authenticated": bool(username), "username": username}
+    return {"authenticated": bool(username), "username": display_admin_name(username)}
+
+
+@app.get("/auth/clerk/config")
+def auth_clerk_config() -> dict:
+    return {
+        "enabled": bool(CLERK_PUBLISHABLE_KEY),
+        "publishable_key": CLERK_PUBLISHABLE_KEY,
+    }
 
 
 @app.post("/auth/login")
@@ -152,6 +217,22 @@ def auth_login(
 
     set_session_cookie(response, username)
     return {"status": "authenticated", "username": username}
+
+
+@app.post("/auth/clerk/login")
+def auth_clerk_login(request: Request, response: Response) -> dict:
+    request_state = authenticate_clerk_request(request)
+    payload = getattr(request_state, "payload", None) or {}
+    clerk_user_id = payload.get("sub")
+    if not clerk_user_id:
+        raise HTTPException(status_code=401, detail="Clerk session is missing a user ID.")
+
+    set_session_cookie(response, f"clerk:{clerk_user_id}")
+    return {
+        "status": "authenticated",
+        "username": "Google account",
+        "clerk_user_id": clerk_user_id,
+    }
 
 
 @app.post("/auth/logout")
@@ -236,35 +317,16 @@ def public_endpoint():
 
 @app.get("/paid-content")
 async def secure_endpoint(request: Request):
-    # 1. Grab the token from the request headers
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Missing or invalid Authorization header"
-        )
-    
-    session_token = auth_header.split(" ")[1]
-
-    # 2. Ask Clerk if this token belongs to a real logged-in user
     try:
-        # The verification step automatically decodes the user's session attributes
-        session = clerk_client.sessions.verify(session_token)
-        if not session or not session.is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, 
-                detail="Session has expired or is invalid"
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail=f"Authentication failed: {str(e)}"
-        )
+        request_state = authenticate_clerk_request(request)
+    except HTTPException as exc:
+        if exc.status_code == 503:
+            raise exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=exc.detail) from exc
 
-    # 3. If valid, allow access to the paid logic!
+    payload = getattr(request_state, "payload", None) or {}
     return {
         "status": "Success",
         "message": "Welcome to the paid premium customer area!",
-        "clerk_user_id": session.user_id  # Clerk tracks user IDs for you
+        "clerk_user_id": payload.get("sub"),
     }

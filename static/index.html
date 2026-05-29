@@ -88,7 +88,18 @@
             <button type="button" id="logout-button" class="button-ghost">Sign out</button>
           </div>
         </form>
-        <p class="hint">Use the admin login your team issued to access uploads, email, and scheduling.</p>
+        <div class="auth-divider"><span>or</span></div>
+        <div id="clerk-auth" class="clerk-auth">
+          <button type="button" id="clerk-google-button" class="button-google" disabled>
+            <span class="google-mark">G</span>
+            <span>Continue with Google</span>
+          </button>
+          <div id="clerk-user-button" class="clerk-user-button hidden"></div>
+          <p id="clerk-auth-message" class="hint">Checking Google sign-in...</p>
+        </div>
+        <p class="hint">
+          Use the admin login your team issued, or sign in with Google when Clerk is configured.
+        </p>
       </section>
 
       <section class="dashboard-grid">

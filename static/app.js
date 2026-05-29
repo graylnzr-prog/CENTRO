@@ -10,6 +10,12 @@ const toast = document.getElementById("toast");
 const authForm = document.getElementById("auth-form");
 const authStatus = document.getElementById("auth-status");
 const logoutButton = document.getElementById("logout-button");
+const clerkGoogleButton = document.getElementById("clerk-google-button");
+const clerkAuthMessage = document.getElementById("clerk-auth-message");
+const clerkUserButton = document.getElementById("clerk-user-button");
+let clerkReady = false;
+let clerkUserButtonMounted = false;
+let syncingClerkSession = false;
 
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -35,11 +41,36 @@ logoutButton.addEventListener("click", async () => {
   await fetch("/auth/logout", {
     method: "POST",
   });
+  if (window.Clerk && window.Clerk.isSignedIn) {
+    try {
+      await window.Clerk.signOut();
+    } catch (error) {
+      console.warn("Unable to sign out of Clerk.", error);
+    }
+  }
   state.authenticated = false;
   state.username = "";
   updateAuthUi();
   showToast("Signed out.");
   await loadSchedules();
+});
+
+clerkGoogleButton.addEventListener("click", async () => {
+  if (!clerkReady || !window.Clerk) {
+    showToast("Google sign-in is still loading.");
+    return;
+  }
+
+  if (window.Clerk.isSignedIn) {
+    await syncClerkSession();
+    return;
+  }
+
+  window.Clerk.openSignIn({
+    oauthFlow: "popup",
+    fallbackRedirectUrl: window.location.href,
+    signUpFallbackRedirectUrl: window.location.href,
+  });
 });
 
 document.getElementById("csv-form").addEventListener("submit", async (event) => {
@@ -161,7 +192,7 @@ function ensureAuthenticated() {
     return true;
   }
 
-  showToast("Sign in with your admin login before using this action.");
+  showToast("Sign in with your admin login or Google before using this action.");
   return false;
 }
 
@@ -310,4 +341,132 @@ function updateAuthUi() {
   authStatus.classList.toggle("muted", !state.authenticated);
 }
 
+async function initClerkAuth() {
+  try {
+    const response = await apiFetch("/auth/clerk/config");
+    const config = await response.json();
+
+    if (!config.enabled || !config.publishable_key) {
+      clerkAuthMessage.textContent = "Add Clerk keys on Render to enable Google sign-in.";
+      return;
+    }
+
+    await loadClerkScripts(config.publishable_key);
+    await window.Clerk.load({
+      ui: { ClerkUI: window.__internal_ClerkUICtor },
+    });
+
+    clerkReady = true;
+    clerkGoogleButton.disabled = false;
+    clerkAuthMessage.textContent = "Use your Google account through Clerk.";
+    updateClerkUi();
+
+    window.Clerk.addListener(async ({ session }) => {
+      updateClerkUi();
+      if (session) {
+        await syncClerkSession({ silent: true });
+      }
+    });
+
+    if (window.Clerk.isSignedIn) {
+      await syncClerkSession({ silent: true });
+    }
+  } catch (error) {
+    console.error("Unable to initialize Clerk.", error);
+    clerkAuthMessage.textContent = "Google sign-in could not load. Check Clerk configuration.";
+  }
+}
+
+async function loadClerkScripts(publishableKey) {
+  const clerkDomain = getClerkDomain(publishableKey);
+  await loadScript(`https://${clerkDomain}/npm/@clerk/ui@1/dist/ui.browser.js`);
+  await loadScript(`https://${clerkDomain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`, {
+    "data-clerk-publishable-key": publishableKey,
+  });
+}
+
+function getClerkDomain(publishableKey) {
+  const encodedDomain = publishableKey.split("_")[2];
+  if (!encodedDomain) {
+    throw new Error("Invalid Clerk publishable key.");
+  }
+  return atob(encodedDomain).slice(0, -1);
+}
+
+function loadScript(src, attributes = {}) {
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${src}"]`);
+    if (existingScript) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    Object.entries(attributes).forEach(([key, value]) => {
+      script.setAttribute(key, value);
+    });
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function syncClerkSession({ silent = false } = {}) {
+  if (!window.Clerk || !window.Clerk.session || syncingClerkSession) {
+    return;
+  }
+
+  syncingClerkSession = true;
+  try {
+    const token = await window.Clerk.session.getToken();
+    if (!token) {
+      throw new Error("Clerk did not return a session token.");
+    }
+
+    const response = await apiFetch("/auth/clerk/login", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.detail || "Google sign-in failed.");
+    }
+
+    state.authenticated = true;
+    state.username = payload.username || "Google account";
+    updateAuthUi();
+    updateClerkUi();
+    await loadSchedules();
+    if (!silent) {
+      showToast("Signed in with Google.");
+    }
+  } catch (error) {
+    console.error("Unable to sync Clerk session.", error);
+    if (!silent) {
+      showToast(error.message || "Unable to sign in with Google.");
+    }
+  } finally {
+    syncingClerkSession = false;
+  }
+}
+
+function updateClerkUi() {
+  const signedIn = Boolean(window.Clerk && window.Clerk.isSignedIn);
+  clerkGoogleButton.querySelector("span:last-child").textContent = signedIn
+    ? "Use Google session"
+    : "Continue with Google";
+  clerkUserButton.classList.toggle("hidden", !signedIn);
+
+  if (signedIn && !clerkUserButtonMounted) {
+    window.Clerk.mountUserButton(clerkUserButton);
+    clerkUserButtonMounted = true;
+  }
+}
+
 refreshAuthState();
+initClerkAuth();
