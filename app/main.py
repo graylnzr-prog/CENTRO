@@ -6,9 +6,10 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from clerk_backend_api import Clerk
 
 load_dotenv()
 
@@ -22,6 +23,7 @@ app = FastAPI(title="Sales Dashboard")
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+clerk_client = Clerk(api_key=os.getenv("CLERK_API_KEY"))
 SESSION_SECRET = os.getenv("APP_SESSION_SECRET") or f"{ADMIN_USERNAME}:{ADMIN_PASSWORD}"
 SESSION_COOKIE_NAME = "sales_dashboard_session"
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "28800"))
@@ -227,3 +229,42 @@ def get_schedules(_: str = Depends(require_admin_session)) -> dict:
 @app.post("/jobs/run-schedules")
 def run_schedules(_: str = Depends(require_admin_session)) -> dict:
     return run_due_schedules(output_dir=OUTPUT_DIR)
+    
+@app.get("/public-data")
+def public_endpoint():
+    return {"message": "Anyone can see this data."}
+
+@app.get("/paid-content")
+async def secure_endpoint(request: Request):
+    # 1. Grab the token from the request headers
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Missing or invalid Authorization header"
+        )
+    
+    session_token = auth_header.split(" ")[1]
+
+    # 2. Ask Clerk if this token belongs to a real logged-in user
+    try:
+        # The verification step automatically decodes the user's session attributes
+        session = clerk_client.sessions.verify(session_token)
+        if not session or not session.is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Session has expired or is invalid"
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail=f"Authentication failed: {str(e)}"
+        )
+
+    # 3. If valid, allow access to the paid logic!
+    return {
+        "status": "Success",
+        "message": "Welcome to the paid premium customer area!",
+        "clerk_user_id": session.user_id  # Clerk tracks user IDs for you
+    }

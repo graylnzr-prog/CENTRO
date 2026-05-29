@@ -5,3 +5,4 @@ python-multipart
 pydantic[email]
 requests
 python-dotenv
+clerk-backend-api
