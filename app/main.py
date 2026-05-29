@@ -23,7 +23,7 @@ app = FastAPI(title="Sales Dashboard")
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-clerk_client = Clerk(api_key=os.getenv("CLERK_API_KEY"))
+clerk_client = Clerk(bearer_auth=os.getenv("CLERK_API_KEY"))
 SESSION_SECRET = os.getenv("APP_SESSION_SECRET") or f"{ADMIN_USERNAME}:{ADMIN_PASSWORD}"
 SESSION_COOKIE_NAME = "sales_dashboard_session"
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "28800"))
