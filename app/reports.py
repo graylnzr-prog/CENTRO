@@ -7,7 +7,22 @@ import pandas as pd
 
 COLUMN_ALIASES = {
     "date": ["date", "day", "created_at", "ordered_at"],
-    "sales": ["sales", "total_sales", "amount", "revenue", "total_price"],
+    "sales": [
+        "sales",
+        "total sales",
+        "total_sales",
+        "amount",
+        "revenue",
+        "total_price",
+        "payout",
+        "payouts",
+        "total released amount",
+        "total_released_amount",
+        "net payout",
+        "net_payout",
+        "settlement amount",
+        "settlement_amount",
+    ],
     "product": ["product", "product_title", "title", "item_name", "name"],
 }
 
@@ -25,9 +40,11 @@ def build_report_from_orders(orders: list[dict], source_label: str) -> dict:
 def build_report_from_dataframe(dataframe: pd.DataFrame, source_label: str) -> dict:
     normalized = normalize_dataframe(dataframe.copy())
     if "sales" not in normalized.columns:
-        raise ValueError("A sales column is required. Try sales, revenue, amount, or total_price.")
+        raise ValueError(
+            "A sales column is required. Try sales, total sales, payouts, net payout, or settlement amount."
+        )
 
-    normalized["sales"] = pd.to_numeric(normalized["sales"], errors="coerce").fillna(0.0)
+    normalized["sales"] = parse_amount_series(normalized["sales"])
 
     if "date" in normalized.columns:
         normalized["date"] = pd.to_datetime(normalized["date"], errors="coerce")
@@ -72,6 +89,16 @@ def normalize_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
                 break
 
     return dataframe.rename(columns=rename_map)
+
+
+def parse_amount_series(series: pd.Series) -> pd.Series:
+    cleaned = (
+        series.astype(str)
+        .str.strip()
+        .str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+        .str.replace(r"[$,]", "", regex=True)
+    )
+    return pd.to_numeric(cleaned, errors="coerce").fillna(0.0)
 
 
 def build_daily_sales(dataframe: pd.DataFrame) -> list[dict]:
