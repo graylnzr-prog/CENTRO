@@ -9,6 +9,10 @@ COLUMN_ALIASES = {
     "date": ["date", "day", "created_at", "ordered_at"],
     "sales": [
         "sales",
+        "net sales",
+        "Net_Sales",
+        "Net Sales",
+        "net_sales",
         "total sales",
         "total_sales",
         "amount",
