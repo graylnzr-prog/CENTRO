@@ -74,31 +74,17 @@
           </div>
           <span id="auth-status" class="pill muted">Signed out</span>
         </div>
-        <form id="auth-form" class="stack-form auth-form">
-          <label class="field">
-            <span>Username</span>
-            <input type="text" name="username" autocomplete="username" required />
-          </label>
-          <label class="field">
-            <span>Password</span>
-            <input type="password" name="password" autocomplete="current-password" required />
-          </label>
-          <div class="auth-actions">
-            <button type="submit" class="button-primary">Sign in</button>
-            <button type="button" id="logout-button" class="button-ghost">Sign out</button>
-          </div>
-        </form>
-        <div class="auth-divider"><span>or</span></div>
         <div id="clerk-auth" class="clerk-auth">
           <button type="button" id="clerk-google-button" class="button-google" disabled>
             <span class="google-mark">G</span>
             <span>Continue with Google</span>
           </button>
+          <button type="button" id="logout-button" class="button-ghost">Sign out</button>
           <div id="clerk-user-button" class="clerk-user-button hidden"></div>
           <p id="clerk-auth-message" class="hint">Checking Google sign-in...</p>
         </div>
         <p class="hint">
-          Use the admin login your team issued, or sign in with Google when Clerk is configured.
+          Use your Google account through Clerk to access private dashboard actions.
         </p>
       </section>
 

@@ -1,4 +1,5 @@
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
+import { Show, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -17,14 +18,15 @@ export default function Home() {
               account controls for the app.
             </p>
             <Show when="signed-out">
-              <SignInButton mode="redirect">
-                <button className="inline-flex h-12 items-center justify-center gap-3 rounded-md border border-zinc-300 bg-white px-5 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-100">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 text-xs font-bold">
-                    G
-                  </span>
-                  Continue with Google
-                </button>
-              </SignInButton>
+              <Link
+                className="inline-flex h-12 items-center justify-center gap-3 rounded-md border border-zinc-300 bg-white px-5 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-100"
+                href="/sign-in"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 text-xs font-bold">
+                  G
+                </span>
+                Continue with Google
+              </Link>
             </Show>
             <Show when="signed-in">
               <div className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white p-4">

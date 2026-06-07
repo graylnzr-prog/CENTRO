@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import {
   ClerkProvider,
   Show,
-  SignInButton,
-  SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
 import Link from "next/link";
@@ -29,16 +27,12 @@ export default function RootLayout({
             </Link>
             <nav className="flex items-center gap-3">
               <Show when="signed-out">
-                <SignInButton mode="redirect">
-                  <button className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100">
-                    Sign in
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="redirect">
-                  <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800">
-                    Get started
-                  </button>
-                </SignUpButton>
+                <Link
+                  className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+                  href="/sign-in"
+                >
+                  Continue with Google
+                </Link>
               </Show>
               <Show when="signed-in">
                 <UserButton />

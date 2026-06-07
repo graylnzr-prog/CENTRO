@@ -22,10 +22,9 @@ from app.scheduler import ScheduleRequest, create_schedule, list_schedules
 
 app = FastAPI(title="Sales Dashboard")
 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY") or os.getenv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "")
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY") or os.getenv("CLERK_API_KEY", "")
+RUN_SCHEDULES_TOKEN = os.getenv("RUN_SCHEDULES_TOKEN", "")
 CLERK_ALLOWED_ORIGINS = [
     origin.strip().rstrip("/")
     for origin in os.getenv("CLERK_ALLOWED_ORIGINS", "").split(",")
@@ -36,7 +35,7 @@ if CLERK_PUBLISHABLE_KEY:
 if CLERK_SECRET_KEY:
     os.environ.setdefault("CLERK_SECRET_KEY", CLERK_SECRET_KEY)
 clerk_client = Clerk(bearer_auth=CLERK_SECRET_KEY) if CLERK_SECRET_KEY else None
-SESSION_SECRET = os.getenv("APP_SESSION_SECRET") or f"{ADMIN_USERNAME}:{ADMIN_PASSWORD}"
+SESSION_SECRET = os.getenv("APP_SESSION_SECRET") or CLERK_SECRET_KEY
 SESSION_COOKIE_NAME = "sales_dashboard_session"
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "28800"))
 
@@ -61,9 +60,8 @@ def get_current_admin(request: Request) -> str | None:
     except ValueError:
         return None
 
-    is_password_admin = bool(ADMIN_USERNAME and ADMIN_PASSWORD and username == ADMIN_USERNAME)
     is_clerk_admin = bool(CLERK_SECRET_KEY and username.startswith("clerk:"))
-    if not is_password_admin and not is_clerk_admin:
+    if not is_clerk_admin:
         return None
 
     try:
@@ -88,16 +86,26 @@ def get_current_admin(request: Request) -> str | None:
 
 
 def require_admin_session(request: Request) -> str:
-    if not (ADMIN_USERNAME and ADMIN_PASSWORD) and not CLERK_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Admin login is not configured.")
+    if not CLERK_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
 
     username = get_current_admin(request)
     if not username:
-        raise HTTPException(status_code=401, detail="Please sign in with your admin login.")
+        raise HTTPException(status_code=401, detail="Please sign in with Google.")
     return username
 
 
+def require_schedule_runner(request: Request) -> str:
+    bearer_token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    if RUN_SCHEDULES_TOKEN and hmac.compare_digest(bearer_token, RUN_SCHEDULES_TOKEN):
+        return "schedule-runner"
+    return require_admin_session(request)
+
+
 def build_session_value(username: str) -> str:
+    if not SESSION_SECRET:
+        raise HTTPException(status_code=503, detail="Session signing is not configured.")
+
     expires_at = int(time.time()) + SESSION_TTL_SECONDS
     payload = f"{username}|{expires_at}"
     signature = hmac.new(
@@ -192,7 +200,7 @@ def healthcheck() -> dict:
 @app.get("/auth/status")
 def auth_status(request: Request) -> dict:
     username = get_current_admin(request)
-    return {"authenticated": bool(username), "username": display_admin_name(username)}
+    return {"authenticated": bool(username), "display_name": display_admin_name(username)}
 
 
 @app.get("/auth/clerk/config")
@@ -201,22 +209,6 @@ def auth_clerk_config() -> dict:
         "enabled": bool(CLERK_PUBLISHABLE_KEY),
         "publishable_key": CLERK_PUBLISHABLE_KEY,
     }
-
-
-@app.post("/auth/login")
-def auth_login(
-    response: Response,
-    username: str = Form(...),
-    password: str = Form(...),
-) -> dict:
-    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-        raise HTTPException(status_code=503, detail="Admin login is not configured.")
-
-    if username != ADMIN_USERNAME or password != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Invalid admin login.")
-
-    set_session_cookie(response, username)
-    return {"status": "authenticated", "username": username}
 
 
 @app.post("/auth/clerk/login")
@@ -230,7 +222,7 @@ def auth_clerk_login(request: Request, response: Response) -> dict:
     set_session_cookie(response, f"clerk:{clerk_user_id}")
     return {
         "status": "authenticated",
-        "username": "Google account",
+        "display_name": "Google account",
         "clerk_user_id": clerk_user_id,
     }
 
@@ -308,7 +300,7 @@ def get_schedules(_: str = Depends(require_admin_session)) -> dict:
 
 
 @app.post("/jobs/run-schedules")
-def run_schedules(_: str = Depends(require_admin_session)) -> dict:
+def run_schedules(_: str = Depends(require_schedule_runner)) -> dict:
     return run_due_schedules(output_dir=OUTPUT_DIR)
     
 @app.get("/public-data")

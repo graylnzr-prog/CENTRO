@@ -3,11 +3,10 @@ const state = {
   source: null,
   csvPath: null,
   authenticated: false,
-  username: "",
+  accountName: "",
 };
 
 const toast = document.getElementById("toast");
-const authForm = document.getElementById("auth-form");
 const authStatus = document.getElementById("auth-status");
 const logoutButton = document.getElementById("logout-button");
 const clerkGoogleButton = document.getElementById("clerk-google-button");
@@ -16,26 +15,6 @@ const clerkUserButton = document.getElementById("clerk-user-button");
 let clerkReady = false;
 let clerkUserButtonMounted = false;
 let syncingClerkSession = false;
-
-authForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const response = await fetch("/auth/login", {
-    method: "POST",
-    body: formData,
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    showToast(payload.detail || "Unable to sign in.");
-    return;
-  }
-
-  state.authenticated = true;
-  state.username = payload.username || String(formData.get("username") || "");
-  updateAuthUi();
-  showToast(`Signed in as ${state.username}.`);
-  await loadSchedules();
-});
 
 logoutButton.addEventListener("click", async () => {
   await fetch("/auth/logout", {
@@ -49,7 +28,7 @@ logoutButton.addEventListener("click", async () => {
     }
   }
   state.authenticated = false;
-  state.username = "";
+  state.accountName = "";
   updateAuthUi();
   showToast("Signed out.");
   await loadSchedules();
@@ -66,11 +45,25 @@ clerkGoogleButton.addEventListener("click", async () => {
     return;
   }
 
-  window.Clerk.openSignIn({
-    oauthFlow: "popup",
-    fallbackRedirectUrl: window.location.href,
-    signUpFallbackRedirectUrl: window.location.href,
-  });
+  const popup = window.open("about:blank", "google-sign-in", "width=600,height=800");
+  if (!popup) {
+    showToast("Allow popups to continue with Google.");
+    return;
+  }
+
+  try {
+    await window.Clerk.client.signIn.authenticateWithPopup({
+      popup,
+      strategy: "oauth_google",
+      redirectUrl: window.location.href,
+      redirectUrlComplete: window.location.href,
+    });
+    await syncClerkSession();
+  } catch (error) {
+    popup.close();
+    console.error("Unable to start Google sign-in.", error);
+    showToast("Unable to start Google sign-in.");
+  }
 });
 
 document.getElementById("csv-form").addEventListener("submit", async (event) => {
@@ -192,7 +185,7 @@ function ensureAuthenticated() {
     return true;
   }
 
-  showToast("Sign in with your admin login or Google before using this action.");
+  showToast("Sign in with Google before using this action.");
   return false;
 }
 
@@ -201,7 +194,7 @@ async function handleReportResponse(response, successMessage) {
   if (!response.ok) {
     if (response.status === 401) {
       state.authenticated = false;
-      state.username = "";
+      state.accountName = "";
       updateAuthUi();
     }
     showToast(payload.detail || "Something went wrong.");
@@ -292,7 +285,7 @@ function renderJobResult(payload) {
 async function loadSchedules() {
   const container = document.getElementById("schedule-list");
   if (!state.authenticated) {
-    container.innerHTML = listItem("Dashboard locked", "Sign in with your admin login to view and save schedules.");
+    container.innerHTML = listItem("Dashboard locked", "Sign in with Google to view and save schedules.");
     return;
   }
 
@@ -329,14 +322,14 @@ async function refreshAuthState() {
   const response = await apiFetch("/auth/status");
   const payload = await response.json();
   state.authenticated = Boolean(payload.authenticated);
-  state.username = payload.username || "";
+  state.accountName = payload.display_name || "";
   updateAuthUi();
   await loadSchedules();
 }
 
 function updateAuthUi() {
   authStatus.textContent = state.authenticated
-    ? `Signed in as ${state.username || "admin"}`
+    ? `Signed in as ${state.accountName || "Google account"}`
     : "Signed out";
   authStatus.classList.toggle("muted", !state.authenticated);
 }
@@ -438,7 +431,7 @@ async function syncClerkSession({ silent = false } = {}) {
     }
 
     state.authenticated = true;
-    state.username = payload.username || "Google account";
+    state.accountName = payload.display_name || "Google account";
     updateAuthUi();
     updateClerkUi();
     await loadSchedules();
