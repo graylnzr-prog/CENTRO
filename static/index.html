@@ -66,27 +66,33 @@
         </div>
       </section>
 
-      <section class="card auth-card">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Admin Login</p>
-            <h2>Unlock the dashboard</h2>
-          </div>
-          <span id="auth-status" class="pill muted">Signed out</span>
-        </div>
-        <div id="clerk-auth" class="clerk-auth">
-          <button type="button" id="clerk-google-button" class="button-google" disabled>
-            <span class="google-mark">G</span>
-            <span>Continue with Google</span>
-          </button>
-          <button type="button" id="logout-button" class="button-ghost">Sign out</button>
-          <div id="clerk-user-button" class="clerk-user-button hidden"></div>
-          <p id="clerk-auth-message" class="hint">Checking Google sign-in...</p>
-        </div>
-        <p class="hint">
-          Use your Google account through Clerk to access private dashboard actions.
-        </p>
-      </section>
+<section class="card auth-card">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Admin Login</p>
+      <h2>Unlock the dashboard</h2>
+    </div>
+    <span id="auth-status" class="pill muted">Signed out</span>
+  </div>
+
+  <div id="clerk-auth" class="clerk-auth">
+    
+    <button type="button" id="clerk-google-button" class="button-google">
+      <span class="google-mark">G</span>
+      <span>Continue with Google</span>
+    </button>
+    
+    <button type="button" id="logout-button" class="button-ghost hidden">Sign out</button>
+    
+    <div id="clerk-user-button" class="clerk-user-button hidden"></div>
+    
+    <p id="clerk-auth-message" class="hint">Checking Google sign-in...</p>
+  </div>
+  
+  <p class="hint">
+    Use your Google account through Clerk to access private dashboard actions.
+  </p>
+</section>			
 
       <section class="dashboard-grid">
         <section class="card section-card">
